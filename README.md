@@ -48,7 +48,7 @@ This routine isn't called just once but *every time*
 
 - when a level starts, after the level name is displayed and the game waits for a button press (i.e. right before the "sword window" screen transition from black),
 - when a level has been completed (right after the "sword window" screen transition to black),
-- and sometimes even in between sections of a level. (This is particularly annoying as you need to quickly move the ARP's switch to the middle position (off) as soon as the game takes control of your character and makes him walk off-screen, or else your attempt to save the kingdom of Sellech by means of cheating will be thwarted immediately. :wink:
+- and sometimes even in between sections of a level. This is particularly annoying as you need to quickly move the ARP's switch to the middle position (off) as soon as the game takes control of your character and makes him walk off-screen, or else your attempt to save the kingdom of Sellech by means of cheating will be thwarted immediately. :wink:
 
 ![legend_us_sword.png](screenshots/legend_us_sword.png)
 
