@@ -1,18 +1,16 @@
-===========================================================================================
+# LEGEND – Copy Protection Mechanism & ARP Cheating
+**Software reverse engineering by Ramsis a.k.a. ManuLöwe, August 2022**
 
-    LEGEND - Copy Protection Mechanism & ARP Cheating
-    Software reverse engineering by Ramsis a.k.a. ManuLöwe, August 2022
+![legend_us_titlescreen.png](screenshots/legend_us_titlescreen.png)
 
-===========================================================================================
+The SNES game _Legend_ by Arcade Zone Ltd./Seika Corporation implements a rather elaborate copy protection mechanism designed to prevent the use of an Action Replay cheat device, playing the game on a copier, and/or playing it on a SNES console from another region. (On a side note, using a Game Genie should be fine as this device only ever modifies ROM data, not RAM, and therefore won't interfere with CPU exception vectors and such.)
 
-
-The SNES game "Legend" by Arcade Zone Ltd. implements a rather elaborate copy protection mechanism designed to prevent the use of an Action Replay cheat device, playing the game on a copier, and/or playing it on a SNES console from another region. (On a side note, using a Game Genie should be fine as this device only ever modifies ROM data, not RAM, and therefore won't interfere with CPU exception vectors and such.)
-
-During the boot process, the vertical display frequency is determined via the STAT78 register ($213F). Bit 4 is kept and shifted right four times (to bit 0). Finally, the resulting value of $01 (50 Hz) or $00 (60 Hz) is stored to DP variable $2D for the purpose of subsequent checks.
+During the boot process, the vertical display frequency is determined via the `STAT78` register (`$213F`). Bit 4 is kept and shifted right four times (to bit 0). Finally, a resulting 16-bit value of `$0001` (50 Hz) or `$0000` (60 Hz) is stored to DP location `$2D` (zeroing out `$2E` in both cases) for the purpose of subsequent checks.
 
 
 Tracelog PAL version:
 
+```
 8080ac lda $213f      [82213f] A:0080 X:0220 Y:0000 S:01ff D:0000 DB:82 N.M..I.C V: 95 H: 90 F:12
 8080af and #$10                A:0033 X:0220 Y:0000 S:01ff D:0000 DB:82 ..M..I.C V: 95 H: 96 F:12
 8080b1 lsr                     A:0010 X:0220 Y:0000 S:01ff D:0000 DB:82 ..M..I.C V: 95 H: 99 F:12
@@ -22,10 +20,11 @@ Tracelog PAL version:
 8080b5 rep #$20                A:0001 X:0220 Y:0000 S:01ff D:0000 DB:82 ..M..I.. V: 95 H:111 F:12
 8080b7 and #$00ff              A:0001 X:0220 Y:0000 S:01ff D:0000 DB:82 .....I.. V: 95 H:115 F:12
 8080ba sta $2d        [00002d] A:0001 X:0220 Y:0000 S:01ff D:0000 DB:82 .....I.. V: 95 H:120 F:12
-
+```
 
 Tracelog US version:
 
+```
 8080ac lda $213f      [82213f] A:0080 X:0220 Y:0000 S:01ff D:0000 DB:82 N.M..I.C V:171 H: 97 F:14
 8080af and #$10                A:0023 X:0220 Y:0000 S:01ff D:0000 DB:82 ..M..I.C V:171 H:103 F:14
 8080b1 lsr                     A:0000 X:0220 Y:0000 S:01ff D:0000 DB:82 ..M..IZC V:171 H:106 F:14
@@ -35,29 +34,37 @@ Tracelog US version:
 8080b5 rep #$20                A:0000 X:0220 Y:0000 S:01ff D:0000 DB:82 ..M..IZ. V:171 H:118 F:14
 8080b7 and #$00ff              A:0000 X:0220 Y:0000 S:01ff D:0000 DB:82 .....IZ. V:171 H:122 F:14
 8080ba sta $2d        [00002d] A:0000 X:0220 Y:0000 S:01ff D:0000 DB:82 .....IZ. V:171 H:127 F:14
+```
 
-
-(BTW, the developers could have omitted the AND #$10 instruction and instead replace the AND #$00FF with AND #$0001, but what do I know.)
+(BTW, the developers could have omitted the `AND #$10` instruction and instead replace the `AND #$00FF` with `AND #$0001`, but what do I know.)
 
 In case you thought, "well, that was lame," buckle up for what comes next ...
 
-The routine that performs all of the other checks lives at $(80)80e2 -- conveniently, the address is the same in both the PAL and the US ROM.
+![legend_us_character.png](screenshots/legend_us_character.png)
+
+The routine that performs all of the other checks lives at `$(80)80E2` – conveniently, the address is the same in both the PAL and the US ROM.
 
 This routine isn't called just once but *every time*
+
 - when a level starts, after the level name is displayed and the game waits for a button press (i.e. right before the "sword window" screen transition from black),
 - when a level has been completed (right after the "sword window" screen transition to black),
-- and sometimes even in between sections of a level. (This is particularly annoying as you need to quickly move the ARP's switch to the middle position (off) as soon as the game takes control of your character and makes him walk off-screen, or else your attempt to save the kingdom of Sellech as a cheater will be thwarted immediately. ;-)
+- and sometimes even in between sections of a level. (This is particularly annoying as you need to quickly move the ARP's switch to the middle position (off) as soon as the game takes control of your character and makes him walk off-screen, or else your attempt to save the kingdom of Sellech by means of cheating will be thwarted immediately. :wink:
+
+![legend_us_sword.png](screenshots/legend_us_sword.png)
 
 The routine checks if
-- CPU exception vectors ($00FE00-$00FFFF) are intact (ARP patches the NMI vector when codes are enabled)
-- the DP variable $2D still contains the expected value (see above), depending on the region of the game
-- SRAM is present/visible (as it would be on earlier copier models) by writing and reading two 16-bit values ($0102 and, if it reads back correctly, $0201) to/from $770000 using indirect addressing, possibly to somewhat hide the fact that SRAM is accessed at all. What's especially puzzling is how the SRAM bank byte gets put together ...
 
-Lastly, a 16-bit result ($0000 when no "violation" is found, otherwise $0001) is stored to variable $0200, which is then checked to determine if gameplay should end, resulting in the dreaded "THIS GAME PAK IS NOT DESIGNED FOR YOUR SUPER FAMICOM OR SUPER NES. ARCADE ZONE LTD" message.
+- CPU exception vectors (`$00FE00-$00FFFF`) are intact (ARP patches the NMI vector when codes are enabled)
+- the DP variable `$2D` still contains the expected value (see above), depending on the region of the game
+- SRAM is present/visible (as it would be on earlier copier models) by writing and reading two 16-bit values (`$0102` and, if it reads back correctly, `$0201`) to/from `$770000` using indirect addressing, possibly to somewhat hide the fact that SRAM is accessed at all. What's especially puzzling is how the SRAM bank byte gets put together ...
 
+Lastly, a 16-bit result (`$0000` when no "violation" is found, otherwise `$0001`) is stored to variable `$0200`, which is then checked to determine if gameplay should end, resulting in the dreaded **THIS GAME PAK IS NOT DESIGNED FOR YOUR SUPER FAMICOM OR SUPER NES** message.
+
+![legend_e_error.png](screenshots/legend_e_error.png)
 
 Tracelog/disassembly of routine:
 
+```
 [PAL]   809853 jsr $80e2      [8080e2] A:00ff X:0000 Y:0014 S:01fc D:0000 DB:82 .....I.. V:232 H: 79 F: 0
 [US]    809850 jsr $80e2      [8080e2] A:0000 X:0010 Y:0098 S:01fc D:0000 DB:82 .....IZC V:249 H:122 F:32
 
@@ -172,23 +179,24 @@ Tracelog/disassembly of routine:
 ; no cheating attempts detected, continue game normally
 [PAL]   80985e jsr $f359      [80f359] A:0000 X:0000 Y:0014 S:01fc D:0000 DB:82 .....IZ. V:233 H: 72 F: 0
 [US]    80985b jsr $f39a      [80f39a] A:0000 X:0010 Y:0098 S:01fc D:0000 DB:82 .....IZC V:250 H:190 F:32
-
+```
 
 Whew!
 
-Now, in theory, there are multiple options to defeat this. A one-byte fix is mandatory so as to minimize ARP code input work. ;-) The simplest and most obvious option would be to replace the first byte in the subroutine with an RTS instruction (ARP ROM code: 8080E260), thus bypassing it entirely. This, however, would rely upon WRAM, particularly bytes $0200 and $0201, having been zeroed-out at some point (and not been modified afterwards) before the routine is called, which I haven't verified. (Putting the RTS right after the "cheater status" variable gets zeroed within the routine won't work because the stack contains unrelated data at this point.)
+Now, in theory, there are multiple options to defeat this. A one-byte fix is mandatory so as to minimize ARP code input work. :wink: The simplest and most obvious option would be to replace the first byte in the subroutine with an RTS instruction (ARP ROM code: `8080E260`), thus bypassing it entirely. This, however, would rely upon WRAM, particularly bytes `$0200` and `$0201` having been zeroed-out at some point (and not been modified afterwards) before the routine is called, which I haven't verified. (Putting the `RTS` right after the "cheater status" variable gets zeroed within the routine won't work because the stack contains unrelated data at this point.)
 Replacing the branch-if-zero instruction in the "cheater status" check after the subroutine with a branch-always instruction would definitely work, but require a different code for each region release of the game (PAL and US).
-Also note that a RAM cheat keeping the "cheater status" variable at a value of zero, like 7E020000 or 00020000, won't work in this scenario at all, likely because NMI/IRQ is disabled at the time the variable is checked. (Yeah, the developers really went out of their way to stop people from messing about ... ;-)
+Also note that a RAM cheat keeping the "cheater status" variable at a value of zero, like `7E020000` or `00020000`, won't work in this scenario at all, likely because NMI/IRQ is disabled at the time the variable is checked. (Yeah, the developers really went out of their way to stop people from messing about ... :wink:)
 
 So, the easiest and probably most elegant way to do it is to write zero to the "cheater status" variable in the "player's doom" section close to the end of the routine, making the game "forget" that if at all, any manipulation whatsoever has been detected.
 
-ARP ROM code : 80816700 (to be entered before any RAM code)
-GG equivalent: DD61-1FAD
+ARP ROM code : `80816700` (to be entered before any RAM code)
 
-In case it isn't obvious, these codes work on both the PAL and the US release of the game. :-)
+GG equivalent: `DD61-1FAD`
+
+In case it isn't obvious, these codes work on both the PAL and the US release of the game. :grinning:
+
+![legend_us_cheating.png](screenshots/legend_us_cheating.png)
 
 That's all, folks.
 
--------------------------------------------------------------------
-| © 2022 by Ramsis/ManuLöwe   |   https://github.com/Ramsis-SNES/ |
--------------------------------------------------------------------
+### © 2022 by Ramsis/ManuLöwe | https://github.com/Ramsis-SNES/
